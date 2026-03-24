@@ -54,7 +54,9 @@ else()
     qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR}/src ${TS_FILES})
 endif()
 
-target_link_libraries(embw-RTOS_Analyzer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Svg)
+add_subdirectory(lib/trace)
+
+target_link_libraries(embw-RTOS_Analyzer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Svg trace_rtos)
 target_include_directories(embw-RTOS_Analyzer PRIVATE src)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

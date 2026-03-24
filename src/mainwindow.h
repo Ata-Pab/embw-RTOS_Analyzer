@@ -4,10 +4,13 @@
 #include <QMainWindow>
 
 QT_BEGIN_NAMESPACE
-namespace Ui {
-class MainWindow;
+namespace Ui
+{
+    class MainWindow;
 }
 QT_END_NAMESPACE
+
+class QLabel;
 
 class MainWindow : public QMainWindow
 {
@@ -19,5 +22,6 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    QLabel         *m_statusLabel{nullptr};
 };
 #endif // MAINWINDOW_H

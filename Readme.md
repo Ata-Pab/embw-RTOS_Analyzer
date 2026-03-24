@@ -2,6 +2,12 @@
 
 Lightweight RTOS (FreeRTOS + Bare Metal Designs with Timer Scheduler) Analyzer.
 
+### Environment/Platform/Framework
+- Windows 10/11
+- Qt Creator 19.0.0
+- Based on Qt 6.10.2 (MSVC 2022, x86_64)
+- QT Widget Application
+
 ### Track/View
 
 - Task switched IN / OUT
@@ -9,7 +15,7 @@ Lightweight RTOS (FreeRTOS + Bare Metal Designs with Timer Scheduler) Analyzer.
 - ISR entered / exited
 - Queue transmit / receive
 - Semaphore take / give
-- System Eevent triggered
+- System Event triggered
 
 ### Method
 

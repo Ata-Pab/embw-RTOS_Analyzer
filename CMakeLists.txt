@@ -9,8 +9,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Svg LinguistTools)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Svg LinguistTools)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Svg Network LinguistTools)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Svg Network LinguistTools)
 
 set(TS_FILES translations/embw-RTOS_Analyzer_en_US.ts)
 
@@ -20,6 +20,13 @@ set(PROJECT_SOURCES
     src/mainwindow.h
     src/mainwindow.ui
     src/theme/theme.h
+    src/rtos/rtosevent.h
+    src/network/udpreceiver.h
+    src/network/udpreceiver.cpp
+    src/panels/logpanel.h
+    src/panels/logpanel.cpp
+    src/panels/tracerpanel.h
+    src/panels/tracerpanel.cpp
     src/components/button.h
     src/components/button.cpp
     src/components/iconbutton.h
@@ -56,7 +63,11 @@ endif()
 
 add_subdirectory(lib/trace)
 
-target_link_libraries(embw-RTOS_Analyzer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Svg trace_rtos)
+target_link_libraries(embw-RTOS_Analyzer PRIVATE
+    Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::Svg
+    Qt${QT_VERSION_MAJOR}::Network
+    trace_rtos)
 target_include_directories(embw-RTOS_Analyzer PRIVATE src)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

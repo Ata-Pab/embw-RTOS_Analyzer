@@ -107,6 +107,13 @@ void MainWindow::buildUi()
     m_portSpin->setRange(1, 65535);
     m_portSpin->setValue(9999);
     m_portSpin->setFixedWidth(72);
+    m_portSpin->setStyleSheet(QStringLiteral(
+        "QSpinBox { background: #0D1117; color: #C9D1D9; border: 1px solid #30363D; border-radius: 4px; padding: 2px 6px; }"
+        "QSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 16px; border-left: 1px solid #30363D; }"
+        "QSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 16px; border-left: 1px solid #30363D; }"
+        "QSpinBox::up-arrow, QSpinBox::down-arrow { width: 8px; height: 8px; }"
+        "QSpinBox::up-arrow { image: url(:/icons/up_arrow.png); }"
+        "QSpinBox::down-arrow { image: url(:/icons/down_arrow.png); }"));
     m_portSpin->setToolTip(QStringLiteral("UDP port (1–65535)"));
 
     // Connect / Disconnect

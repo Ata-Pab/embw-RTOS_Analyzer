@@ -4,6 +4,8 @@
 #include <QPainterPath>
 #include <QScrollBar>
 #include <QTimer>
+#include <QToolTip>
+#include <QMouseEvent>
 #include <QWheelEvent>
 #include <QPolygon>
 #include <cmath>
@@ -26,6 +28,7 @@ TracerPanel::TracerPanel(QWidget *parent) : QWidget(parent)
     setMinimumHeight(100);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::MinimumExpanding);
     setAttribute(Qt::WA_OpaquePaintEvent);
+    setMouseTracking(true);
 
     m_hScrollBar = new QScrollBar(Qt::Horizontal, this);
     m_hScrollBar->setRange(0, 0);
@@ -80,11 +83,11 @@ int TracerPanel::trackIndexOf(const QString &name, int id)
 // ─── Public slots ─────────────────────────────────────────────────────────────
 void TracerPanel::appendEvent(const RtosEvent &event)
 {
-    if (m_firstEventMs < 0)
-        m_firstEventMs = event.timestamp.toMSecsSinceEpoch();
+    if (m_firstEventUs < 0)
+        m_firstEventUs = event.timestampUs;
 
-    const qint64 timeMs = event.timestamp.toMSecsSinceEpoch() - m_firstEventMs;
-    m_totalDurationMs = qMax(m_totalDurationMs, timeMs);
+    const qint64 timeUs = event.timestampUs - m_firstEventUs;
+    m_totalDurationMs = qMax(m_totalDurationMs, timeUs / 1000);
 
     const int idx = trackIndexOf(event.taskName, event.taskId);
     TaskTrack &track = m_tracks[idx];
@@ -93,13 +96,13 @@ void TracerPanel::appendEvent(const RtosEvent &event)
     switch (event.eventType)
     {
     case RtosEventType::SwitchedIn:
-        track.activeStart = timeMs;
+        track.activeStart = timeUs;
         break;
 
     case RtosEventType::SwitchedOut:
         if (track.activeStart >= 0)
         {
-            track.ranges.append({track.activeStart, timeMs});
+            track.ranges.append({track.activeStart, timeUs});
             track.activeStart = -1;
         }
         break;
@@ -108,14 +111,14 @@ void TracerPanel::appendEvent(const RtosEvent &event)
     case RtosEventType::StackOverflow:
         if (track.activeStart >= 0)
         {
-            track.ranges.append({track.activeStart, timeMs});
+            track.ranges.append({track.activeStart, timeUs});
             track.activeStart = -1;
         }
-        track.markers.append({timeMs, event.eventType});
+        track.markers.append({timeUs, event.eventType});
         break;
 
     default:
-        track.markers.append({timeMs, event.eventType});
+        track.markers.append({timeUs, event.eventType});
         break;
     }
 
@@ -141,7 +144,7 @@ void TracerPanel::appendEvent(const RtosEvent &event)
 void TracerPanel::clear()
 {
     m_tracks.clear();
-    m_firstEventMs = -1;
+    m_firstEventUs = -1;
     m_totalDurationMs = 0;
     m_scrollOffsetMs = 0;
     m_followLatest = true;
@@ -435,13 +438,13 @@ void TracerPanel::drawTracks(QPainter &p, const QRect &area,
 
         for (const auto &range : track.ranges)
         {
-            if (range.endMs < startMs || range.startMs > endMs)
+            const double rStartMs = range.startUs / 1000.0;
+            const double rEndMs = range.endUs / 1000.0;
+            if (rEndMs < startMs || rStartMs > endMs)
                 continue;
 
-            const int x1 = plotX + static_cast<int>(
-                                       qMax<qint64>(range.startMs - startMs, 0) * m_pixelsPerMs);
-            const int x2 = plotX + static_cast<int>(
-                                       (qMin(range.endMs, endMs) - startMs) * m_pixelsPerMs);
+            const int x1 = plotX + static_cast<int>(qMax(0.0, rStartMs - startMs) * m_pixelsPerMs);
+            const int x2 = plotX + static_cast<int>((qMin(rEndMs, static_cast<double>(endMs)) - startMs) * m_pixelsPerMs);
             const int w = qMax(1, x2 - x1);
 
             p.setPen(Qt::NoPen);
@@ -453,28 +456,32 @@ void TracerPanel::drawTracks(QPainter &p, const QRect &area,
         }
 
         // Ongoing (still SWITCHED IN) bar — blinks
-        if (track.activeStart >= 0 && track.activeStart <= endMs)
+        if (track.activeStart >= 0)
         {
-            const int x1 = plotX + static_cast<int>(
-                                       qMax<qint64>(track.activeStart - startMs, 0) * m_pixelsPerMs);
-            const int x2 = plotX + plotW;
-            const QColor fill = blink ? track.color.darker(140) : track.color.darker(190);
+            const double aMs = track.activeStart / 1000.0;
+            if (aMs <= endMs)
+            {
+                const int x1 = plotX + static_cast<int>(qMax(0.0, aMs - startMs) * m_pixelsPerMs);
+                const int x2 = plotX + plotW;
+                const QColor fill = blink ? track.color.darker(140) : track.color.darker(190);
 
-            p.setPen(Qt::NoPen);
-            p.setBrush(fill);
-            p.drawRoundedRect(x1, barY, x2 - x1, barH, 3, 3);
-            p.setPen(QPen(track.color.lighter(140), 1));
-            p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(x1, barY, x2 - x1, barH, 3, 3);
-        }
+                p.setPen(Qt::NoPen);
+                p.setBrush(fill);
+                p.drawRoundedRect(x1, barY, x2 - x1, barH, 3, 3);
+                p.setPen(QPen(track.color.lighter(140), 1));
+                p.setBrush(Qt::NoBrush);
+                p.drawRoundedRect(x1, barY, x2 - x1, barH, 3, 3);
+            } // closes if(aMs <= endMs)
+        } // closes if(track.activeStart >= 0)
 
         // ── Event marker diamonds ─────────────────────────────────────────────
         constexpr int D = 6;
         for (const auto &marker : track.markers)
         {
-            if (marker.timeMs < startMs || marker.timeMs > endMs)
+            const double mMs = marker.timeUs / 1000.0;
+            if (mMs < startMs || mMs > endMs)
                 continue;
-            const int mx = plotX + static_cast<int>((marker.timeMs - startMs) * m_pixelsPerMs);
+            const int mx = plotX + static_cast<int>((mMs - startMs) * m_pixelsPerMs);
 
             QColor mc;
             switch (marker.type)
@@ -512,4 +519,127 @@ void TracerPanel::drawTracks(QPainter &p, const QRect &area,
             p.drawPolygon(diamond);
         }
     }
+}
+
+// ─── Tooltip helpers ──────────────────────────────────────────────────────────
+static QString formatUs(qint64 us)
+{
+    const qint64 ms = us / 1000;
+    const qint64 rem = us % 1000;
+    if (ms >= 60000)
+        return QStringLiteral("%1m %2s %3ms %4\u00b5s")
+            .arg(ms / 60000)
+            .arg((ms % 60000) / 1000)
+            .arg(ms % 1000)
+            .arg(rem);
+    if (ms >= 1000)
+        return QStringLiteral("%1s %2ms %3\u00b5s")
+            .arg(ms / 1000)
+            .arg(ms % 1000)
+            .arg(rem);
+    return QStringLiteral("%1ms %2\u00b5s").arg(ms).arg(rem);
+}
+
+// ─── Mouse move → QToolTip ───────────────────────────────────────────────────
+void TracerPanel::mouseMoveEvent(QMouseEvent *event)
+{
+    const QPoint pos = event->pos();
+    const int sbH = m_hScrollBar->sizeHint().height();
+    const int fullH = height() - sbH - BotPad;
+    const int tracksY = TopPad + LegendH + TimeAxisH;
+    const int tracksH = fullH - tracksY;
+
+    if (pos.x() < LaneHeaderW || pos.y() < tracksY || pos.y() > tracksY + tracksH)
+    {
+        QToolTip::hideText();
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
+    // Cursor position in µs
+    const double cursorMs = m_scrollOffsetMs + (pos.x() - LaneHeaderW) / m_pixelsPerMs;
+    const qint64 cursorUs = static_cast<qint64>(cursorMs * 1000.0);
+
+    const int row = (pos.y() - tracksY) / LaneHeight;
+    if (row < 0 || row >= m_tracks.size())
+    {
+        QToolTip::hideText();
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
+    const TaskTrack &track = m_tracks[row];
+    const int laneMid = tracksY + row * LaneHeight + LaneHeight / 2;
+
+    // ── Check event marker diamonds (hit radius = D + 4px) ───────────────────
+    constexpr int D = 6;
+    constexpr int hitR = D + 4;
+    for (const auto &marker : track.markers)
+    {
+        const double mMs = marker.timeUs / 1000.0;
+        const int mx = LaneHeaderW + static_cast<int>((mMs - m_scrollOffsetMs) * m_pixelsPerMs);
+        if (qAbs(pos.x() - mx) <= hitR && qAbs(pos.y() - laneMid) <= hitR)
+        {
+            const QString tip = QStringLiteral(
+                                    "<b>%1</b> &nbsp;(ID: %2)<hr>"
+                                    "Event: <b>%3</b><br>"
+                                    "Time:&nbsp; %4")
+                                    .arg(track.name)
+                                    .arg(track.id)
+                                    .arg(rtosEventName(marker.type))
+                                    .arg(formatUs(marker.timeUs));
+            QToolTip::showText(QCursor::pos(), tip, this);
+            return;
+        }
+    }
+
+    // ── Check activity bars ───────────────────────────────────────────────────
+    const int barY = tracksY + row * LaneHeight + 11;
+    const int barH = LaneHeight - 22;
+    if (pos.y() >= barY && pos.y() <= barY + barH)
+    {
+        for (const auto &range : track.ranges)
+        {
+            if (cursorUs >= range.startUs && cursorUs <= range.endUs)
+            {
+                const qint64 durUs = range.endUs - range.startUs;
+                const QString tip = QStringLiteral(
+                                        "<b>%1</b> &nbsp;(ID: %2)<hr>"
+                                        "Start:&nbsp;&nbsp;&nbsp;&nbsp; %3<br>"
+                                        "End:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %4<br>"
+                                        "Duration: %5")
+                                        .arg(track.name)
+                                        .arg(track.id)
+                                        .arg(formatUs(range.startUs))
+                                        .arg(formatUs(range.endUs))
+                                        .arg(formatUs(durUs));
+                QToolTip::showText(QCursor::pos(), tip, this);
+                return;
+            }
+        }
+        // Ongoing (still running) bar
+        if (track.activeStart >= 0 && cursorUs >= track.activeStart)
+        {
+            const QString tip = QStringLiteral(
+                                    "<b>%1</b> &nbsp;(ID: %2)<hr>"
+                                    "Start:&nbsp;&nbsp;&nbsp;&nbsp; %3<br>"
+                                    "Status: <b>RUNNING</b>")
+                                    .arg(track.name)
+                                    .arg(track.id)
+                                    .arg(formatUs(track.activeStart));
+            QToolTip::showText(QCursor::pos(), tip, this);
+            return;
+        }
+    }
+
+    // ── Fallback: show cursor time ────────────────────────────────────────────
+    QToolTip::showText(QCursor::pos(),
+                       QStringLiteral("%1\nTime: %2").arg(track.name, formatUs(cursorUs)), this);
+    QWidget::mouseMoveEvent(event);
+}
+
+void TracerPanel::leaveEvent(QEvent *event)
+{
+    QToolTip::hideText();
+    QWidget::leaveEvent(event);
 }

@@ -16,12 +16,12 @@ struct TaskTrack
 {
     struct ActiveRange
     {
-        qint64 startMs;
-        qint64 endMs;
-    }; ///< endMs=-1 → still running
+        qint64 startUs;
+        qint64 endUs;
+    }; ///< endUs=-1 → still running
     struct Marker
     {
-        qint64 timeMs;
+        qint64 timeUs;
         RtosEventType type;
     };
 
@@ -30,7 +30,7 @@ struct TaskTrack
     QColor color;
     QList<ActiveRange> ranges;
     QList<Marker> markers;
-    qint64 activeStart{-1}; ///< wall-clock ms at last SWITCHED IN
+    qint64 activeStart{-1}; ///< µs since session start at last SWITCHED IN
 };
 
 // ---------------------------------------------------------------------------
@@ -62,6 +62,8 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void leaveEvent(QEvent *event) override;
 
 private:
     int trackIndexOf(const QString &name, int id);
@@ -75,7 +77,7 @@ private:
     QScrollBar *m_hScrollBar{nullptr};
     QTimer *m_animTimer{nullptr};
 
-    qint64 m_firstEventMs{-1};
+    qint64 m_firstEventUs{-1};
     qint64 m_totalDurationMs{0};
     double m_pixelsPerMs{5.0};
     qint64 m_scrollOffsetMs{0};

@@ -34,6 +34,7 @@ void UdpReceiver::stop()
 {
     if (m_socket && m_socket->state() != QAbstractSocket::UnconnectedState)
         m_socket->close();
+    m_sessionStarted = false;
 }
 
 bool UdpReceiver::isListening() const
@@ -54,6 +55,12 @@ void UdpReceiver::onReadyRead()
 
         RtosEvent event;
         event.timestamp = QDateTime::currentDateTime();
+        if (!m_sessionStarted)
+        {
+            m_sessionTimer.start();
+            m_sessionStarted = true;
+        }
+        event.timestampUs = m_sessionTimer.nsecsElapsed() / 1000;
 
         if (parts.size() == 3)
         {

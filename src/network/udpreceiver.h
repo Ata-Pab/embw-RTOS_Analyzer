@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QHostAddress>
 #include "rtos/rtosevent.h"
@@ -35,4 +36,6 @@ private slots:
 
 private:
     QUdpSocket *m_socket{nullptr};
+    QElapsedTimer m_sessionTimer;
+    bool m_sessionStarted{false};
 };

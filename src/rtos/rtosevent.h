@@ -71,6 +71,7 @@ inline RtosEventType rtosEventFromCode(int code)
 struct RtosEvent
 {
     QDateTime timestamp;
+    qint64 timestampUs{0}; ///< µs since session start (from QElapsedTimer)
     QString taskName;
     int taskId{0};
     RtosEventType eventType{RtosEventType::Unknown};

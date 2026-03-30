@@ -31,8 +31,13 @@ set(PROJECT_SOURCES
     src/components/button.cpp
     src/components/iconbutton.h
     src/components/iconbutton.cpp
+    resources/resources.qrc
     ${TS_FILES}
 )
+
+if(WIN32)
+    list(APPEND PROJECT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app_icon.rc")
+endif()
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(embw-RTOS_Analyzer

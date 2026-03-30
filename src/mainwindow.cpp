@@ -113,14 +113,15 @@ void MainWindow::buildUi()
     m_connectBtn = new QPushButton(QStringLiteral("Connect"), toolbar);
     m_connectBtn->setStyleSheet(QStringLiteral(
         "QPushButton         { background:#238636; color:#FFF; border:1px solid #2EA043; border-radius:4px; padding:4px 14px; }"
-        "QPushButton:hover   { background:#2EA043; }"
-        "QPushButton:pressed { background:#1A7F37; }"));
+        "QPushButton:hover   { background:#2EA043; cursor:pointingHandCursor; }"
+        "QPushButton:pressed { background:#1A7F37; }"
+        "QPushButton:disabled { background:#21262D; color:#718397; border-color:#30363D; }"));
 
     m_disconnectBtn = new QPushButton(QStringLiteral("Disconnect"), toolbar);
     m_disconnectBtn->setEnabled(false);
     m_disconnectBtn->setStyleSheet(QStringLiteral(
         "QPushButton         { background:#B91C1C; color:#FFF; border:1px solid #EF4444; border-radius:4px; padding:4px 14px; }"
-        "QPushButton:hover   { background:#DC2626; }"
+        "QPushButton:hover   { background:#DC2626; cursor:pointingHandCursor; }"
         "QPushButton:pressed { background:#991B1B; }"
         "QPushButton:disabled { background:#21262D; color:#718397; border-color:#30363D; }"));
 
@@ -129,9 +130,7 @@ void MainWindow::buildUi()
     // Status indicators (right side)
     m_statusDot = new QLabel(QStringLiteral("\u25CF"), toolbar);
     m_statusDot->setStyleSheet(QStringLiteral("color:#718397; font-size:14px;"));
-
     m_statusLabel = new QLabel(QStringLiteral("Disconnected"), toolbar);
-
     m_eventCountLabel = new QLabel(QStringLiteral("Events: 0"), toolbar);
 
     connect(m_connectBtn, &QPushButton::clicked, this, &MainWindow::onConnectClicked);

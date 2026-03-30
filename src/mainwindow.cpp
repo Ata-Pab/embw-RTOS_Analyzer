@@ -120,7 +120,7 @@ void MainWindow::buildUi()
     m_connectBtn = new QPushButton(QStringLiteral("Connect"), toolbar);
     m_connectBtn->setStyleSheet(QStringLiteral(
         "QPushButton         { background:#238636; color:#FFF; border:1px solid #2EA043; border-radius:4px; padding:4px 14px; }"
-        "QPushButton:hover   { background:#2EA043; cursor:pointingHandCursor; }"
+        "QPushButton:hover   { background:#2EA043; }"
         "QPushButton:pressed { background:#1A7F37; }"
         "QPushButton:disabled { background:#21262D; color:#718397; border-color:#30363D; }"));
 
@@ -128,11 +128,15 @@ void MainWindow::buildUi()
     m_disconnectBtn->setEnabled(false);
     m_disconnectBtn->setStyleSheet(QStringLiteral(
         "QPushButton         { background:#B91C1C; color:#FFF; border:1px solid #EF4444; border-radius:4px; padding:4px 14px; }"
-        "QPushButton:hover   { background:#DC2626; cursor:pointingHandCursor; }"
+        "QPushButton:hover   { background:#DC2626; }"
         "QPushButton:pressed { background:#991B1B; }"
         "QPushButton:disabled { background:#21262D; color:#718397; border-color:#30363D; }"));
 
     auto *clearBtn = new QPushButton(QStringLiteral("Clear"), toolbar);
+
+    m_connectBtn->setCursor(Qt::PointingHandCursor);
+    m_disconnectBtn->setCursor(Qt::PointingHandCursor);
+    clearBtn->setCursor(Qt::PointingHandCursor);
 
     // Status indicators (right side)
     m_statusDot = new QLabel(QStringLiteral("\u25CF"), toolbar);

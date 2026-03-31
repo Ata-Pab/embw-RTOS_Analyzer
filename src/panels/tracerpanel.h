@@ -75,12 +75,14 @@ private:
 
     QList<TaskTrack> m_tracks;
     QScrollBar *m_hScrollBar{nullptr};
+    QScrollBar *m_vScrollBar{nullptr};
     QTimer *m_animTimer{nullptr};
 
     qint64 m_firstEventUs{-1};
     qint64 m_totalDurationMs{0};
     double m_pixelsPerMs{5.0};
     qint64 m_scrollOffsetMs{0};
+    int m_vScrollOffset{0};
     bool m_followLatest{true};
 
     // Layout constants (px)

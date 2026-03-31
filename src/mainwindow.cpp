@@ -11,7 +11,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QScrollArea>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QVBoxLayout>
@@ -169,23 +168,10 @@ void MainWindow::buildUi()
     splitter->setStyleSheet(QStringLiteral(
         "QSplitter::handle { background: #30363D; height: 3px; }"));
 
-    // Tracer inside a QScrollArea for vertical overflow when many tasks are shown
     m_tracerPanel = new TracerPanel;
-
-    auto *tracerScroll = new QScrollArea;
-    tracerScroll->setWidget(m_tracerPanel);
-    tracerScroll->setWidgetResizable(true);
-    tracerScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    tracerScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    tracerScroll->setStyleSheet(QStringLiteral(
-        "QScrollArea { border: none; background: #0D1117; }"
-        "QScrollBar:vertical { background:#161B22; width:8px; border-radius:4px; }"
-        "QScrollBar::handle:vertical { background:#30363D; border-radius:4px; min-height:20px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"));
-
     m_logPanel = new LogPanel;
 
-    splitter->addWidget(tracerScroll);
+    splitter->addWidget(m_tracerPanel);
     splitter->addWidget(m_logPanel);
     splitter->setStretchFactor(0, 3);
     splitter->setStretchFactor(1, 2);

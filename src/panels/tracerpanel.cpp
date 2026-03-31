@@ -42,6 +42,17 @@ TracerPanel::TracerPanel(QWidget *parent) : QWidget(parent)
         m_followLatest   = (val == m_hScrollBar->maximum());
         update(); });
 
+    m_vScrollBar = new QScrollBar(Qt::Vertical, this);
+    m_vScrollBar->setRange(0, 0);
+    m_vScrollBar->setStyleSheet(
+        "QScrollBar:vertical { background:#161B22; width:10px; border-radius:5px; }"
+        "QScrollBar::handle:vertical { background:#30363D; border-radius:5px; min-height:20px; }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }");
+    connect(m_vScrollBar, &QScrollBar::valueChanged, this, [this](int val)
+            {
+        m_vScrollOffset = val;
+        update(); });
+
     // Blink timer drives the "currently running" bar animation
     m_animTimer = new QTimer(this);
     m_animTimer->setInterval(500);
@@ -53,15 +64,12 @@ TracerPanel::TracerPanel(QWidget *parent) : QWidget(parent)
 // ─── Size hints ───────────────────────────────────────────────────────────────
 QSize TracerPanel::sizeHint() const
 {
-    const int sbH = m_hScrollBar ? m_hScrollBar->sizeHint().height() : 12;
-    const int n = qMax(1, m_tracks.size());
-    return QSize(800, TopPad + LegendH + TimeAxisH + n * LaneHeight + BotPad + sbH);
+    return QSize(800, 400);
 }
 
 QSize TracerPanel::minimumSizeHint() const
 {
-    const int sbH = m_hScrollBar ? m_hScrollBar->sizeHint().height() : 12;
-    return QSize(400, TopPad + LegendH + TimeAxisH + 2 * LaneHeight + BotPad + sbH);
+    return QSize(200, 150);
 }
 
 // ─── Track lookup / creation ─────────────────────────────────────────────────
@@ -127,7 +135,8 @@ void TracerPanel::appendEvent(const RtosEvent &event)
     // Auto-follow: keep the latest data in view
     if (m_followLatest)
     {
-        const int plotW = width() - LaneHeaderW;
+        const int sbW = m_vScrollBar->isVisible() ? m_vScrollBar->width() : 0;
+        const int plotW = width() - LaneHeaderW - sbW;
         if (plotW > 0)
         {
             const qint64 visibleMs = static_cast<qint64>(plotW / m_pixelsPerMs);
@@ -147,8 +156,10 @@ void TracerPanel::clear()
     m_firstEventUs = -1;
     m_totalDurationMs = 0;
     m_scrollOffsetMs = 0;
+    m_vScrollOffset = 0;
     m_followLatest = true;
     m_hScrollBar->setRange(0, 0);
+    m_vScrollBar->setRange(0, 0);
     updateGeometry();
     update();
 }
@@ -158,16 +169,22 @@ void TracerPanel::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
     const int sbH = m_hScrollBar->sizeHint().height();
+    const int sbW = m_vScrollBar->sizeHint().width();
     m_hScrollBar->setGeometry(LaneHeaderW,
                               height() - sbH - BotPad,
-                              width() - LaneHeaderW,
+                              width() - LaneHeaderW - sbW,
                               sbH);
+    m_vScrollBar->setGeometry(width() - sbW,
+                              TopPad + LegendH + TimeAxisH,
+                              sbW,
+                              height() - TopPad - LegendH - TimeAxisH - BotPad - sbH);
     updateScrollBar();
 }
 
 void TracerPanel::updateScrollBar()
 {
-    const int plotW = width() - LaneHeaderW;
+    const int sbW = m_vScrollBar->isVisible() ? m_vScrollBar->width() : 0;
+    const int plotW = width() - LaneHeaderW - sbW;
     if (plotW <= 0)
         return;
 
@@ -179,6 +196,27 @@ void TracerPanel::updateScrollBar()
     m_hScrollBar->setPageStep(static_cast<int>(visibleMs));
     m_hScrollBar->setSingleStep(qMax(1, static_cast<int>(visibleMs / 10)));
     m_hScrollBar->blockSignals(false);
+
+    const int tracksY = TopPad + LegendH + TimeAxisH;
+    const int tracksH = height() - tracksY - BotPad - m_hScrollBar->height();
+    const int totalTracksH = m_tracks.size() * LaneHeight;
+
+    if (totalTracksH > tracksH && tracksH > 0)
+    {
+        m_vScrollBar->blockSignals(true);
+        m_vScrollBar->setRange(0, totalTracksH - tracksH);
+        m_vScrollBar->setPageStep(tracksH);
+        m_vScrollBar->setSingleStep(LaneHeight);
+        m_vScrollBar->show();
+        m_vScrollBar->blockSignals(false);
+    }
+    else
+    {
+        m_vScrollBar->blockSignals(true);
+        m_vScrollBar->setRange(0, 0);
+        m_vScrollBar->hide();
+        m_vScrollBar->blockSignals(false);
+    }
 }
 
 // ─── Wheel ────────────────────────────────────────────────────────────────────
@@ -194,13 +232,32 @@ void TracerPanel::wheelEvent(QWheelEvent *event)
     }
     else
     {
-        // Horizontal scroll
-        const int step = m_hScrollBar->singleStep() * 3;
-        const int delta = (event->angleDelta().y() > 0) ? -step : step;
-        const int newVal = qBound(m_hScrollBar->minimum(),
-                                  m_hScrollBar->value() + delta,
-                                  m_hScrollBar->maximum());
-        m_hScrollBar->setValue(newVal); // triggers valueChanged → update
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        const int mouseX = event->position().x();
+#else
+        const int mouseX = event->pos().x();
+#endif
+
+        if (mouseX < LaneHeaderW)
+        {
+            // Vertical scroll
+            if (m_vScrollBar->isVisible())
+            {
+                const int step = m_vScrollBar->singleStep() * 3;
+                const int delta = (event->angleDelta().y() > 0) ? -step : step;
+                m_vScrollBar->setValue(m_vScrollBar->value() + delta);
+            }
+        }
+        else
+        {
+            // Horizontal scroll
+            const int step = m_hScrollBar->singleStep() * 3;
+            const int delta = (event->angleDelta().y() > 0) ? -step : step;
+            const int newVal = qBound(m_hScrollBar->minimum(),
+                                      m_hScrollBar->value() + delta,
+                                      m_hScrollBar->maximum());
+            m_hScrollBar->setValue(newVal); // triggers valueChanged → update
+        }
     }
     event->accept();
 }
@@ -212,6 +269,7 @@ void TracerPanel::paintEvent(QPaintEvent *)
     p.setRenderHint(QPainter::Antialiasing, true);
 
     const int sbH = m_hScrollBar->sizeHint().height();
+    const int sbW = m_vScrollBar->isVisible() ? m_vScrollBar->width() : 0;
     const int fullH = height() - sbH - BotPad; // drawable area above scrollbar
 
     // Overall background
@@ -221,7 +279,7 @@ void TracerPanel::paintEvent(QPaintEvent *)
     p.fillRect(0, 0, LaneHeaderW, fullH, QColor(0x16, 0x1B, 0x22));
 
     const int plotX = LaneHeaderW;
-    const int plotW = width() - LaneHeaderW;
+    const int plotW = width() - LaneHeaderW - sbW;
     const int legendY = TopPad;
     const int timeAxisY = legendY + LegendH;
     const int tracksY = timeAxisY + TimeAxisH;
@@ -232,7 +290,11 @@ void TracerPanel::paintEvent(QPaintEvent *)
 
     drawLegend(p, QRect(plotX, legendY, plotW, LegendH));
     drawTimeAxis(p, QRect(plotX, timeAxisY, plotW, TimeAxisH), startMs, visibleMs);
-    drawTracks(p, QRect(0, tracksY, width(), tracksH), startMs, visibleMs);
+
+    p.save();
+    p.setClipRect(0, tracksY, width() - sbW, tracksH);
+    drawTracks(p, QRect(0, tracksY, width() - sbW, tracksH), startMs, visibleMs);
+    p.restore();
 
     // Vertical separator header | plot
     p.setPen(QColor(0x30, 0x3C, 0x50));
@@ -390,8 +452,11 @@ void TracerPanel::drawTracks(QPainter &p, const QRect &area,
     for (int i = 0; i < m_tracks.size(); ++i)
     {
         const TaskTrack &track = m_tracks[i];
-        const int laneTop = area.y() + i * LaneHeight;
+        const int laneTop = area.y() + i * LaneHeight - m_vScrollOffset;
         const int laneMid = laneTop + LaneHeight / 2;
+
+        if (laneTop + LaneHeight < area.y())
+            continue;
 
         if (laneTop > area.bottom())
             break;
@@ -399,7 +464,7 @@ void TracerPanel::drawTracks(QPainter &p, const QRect &area,
         // ── Lane background ──────────────────────────────────────────────────
         const QColor laneBg = (i % 2 == 0) ? QColor(0x10, 0x17, 0x20)
                                            : QColor(0x0D, 0x13, 0x1A);
-        p.fillRect(LaneHeaderW, laneTop, width() - LaneHeaderW, LaneHeight, laneBg);
+        p.fillRect(LaneHeaderW, laneTop, area.width() - LaneHeaderW, LaneHeight, laneBg);
 
         // ── Lane header (left column) ────────────────────────────────────────
         p.fillRect(0, laneTop, LaneHeaderW, LaneHeight, QColor(0x16, 0x1B, 0x22));
@@ -434,7 +499,7 @@ void TracerPanel::drawTracks(QPainter &p, const QRect &area,
         const int barH = LaneHeight - 22;
         const int barY = laneTop + 11;
         const int plotX = LaneHeaderW;
-        const int plotW = width() - LaneHeaderW;
+        const int plotW = area.width() - LaneHeaderW;
 
         for (const auto &range : track.ranges)
         {
@@ -549,6 +614,14 @@ void TracerPanel::mouseMoveEvent(QMouseEvent *event)
     const int tracksY = TopPad + LegendH + TimeAxisH;
     const int tracksH = fullH - tracksY;
 
+    const int sbW = m_vScrollBar->isVisible() ? m_vScrollBar->width() : 0;
+    if (pos.x() > width() - sbW)
+    {
+        QToolTip::hideText();
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
     if (pos.x() < LaneHeaderW || pos.y() < tracksY || pos.y() > tracksY + tracksH)
     {
         QToolTip::hideText();
@@ -560,7 +633,7 @@ void TracerPanel::mouseMoveEvent(QMouseEvent *event)
     const double cursorMs = m_scrollOffsetMs + (pos.x() - LaneHeaderW) / m_pixelsPerMs;
     const qint64 cursorUs = static_cast<qint64>(cursorMs * 1000.0);
 
-    const int row = (pos.y() - tracksY) / LaneHeight;
+    const int row = (pos.y() - tracksY + m_vScrollOffset) / LaneHeight;
     if (row < 0 || row >= m_tracks.size())
     {
         QToolTip::hideText();
@@ -569,7 +642,7 @@ void TracerPanel::mouseMoveEvent(QMouseEvent *event)
     }
 
     const TaskTrack &track = m_tracks[row];
-    const int laneMid = tracksY + row * LaneHeight + LaneHeight / 2;
+    const int laneMid = tracksY + row * LaneHeight - m_vScrollOffset + LaneHeight / 2;
 
     // ── Check event marker diamonds (hit radius = D + 4px) ───────────────────
     constexpr int D = 6;
@@ -594,7 +667,7 @@ void TracerPanel::mouseMoveEvent(QMouseEvent *event)
     }
 
     // ── Check activity bars ───────────────────────────────────────────────────
-    const int barY = tracksY + row * LaneHeight + 11;
+    const int barY = tracksY + row * LaneHeight - m_vScrollOffset + 11;
     const int barH = LaneHeight - 22;
     if (pos.y() >= barY && pos.y() <= barY + barH)
     {
